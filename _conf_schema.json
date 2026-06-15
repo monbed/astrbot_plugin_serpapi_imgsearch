@@ -1,0 +1,97 @@
+{
+  "vlm_provider_id": {
+    "type": "string",
+    "description": "用于图片理解（VLM）的 Provider 唯一 ID",
+    "hint": "文字搜图用它对候选图做视觉筛选。留空则使用当前会话默认的对话模型（需支持图片输入）。",
+    "default": ""
+  },
+  "batch_size": {
+    "type": "int",
+    "description": "每轮淘汰赛单批处理的图片数量",
+    "hint": "数值越大单次比较的图越多、轮数越少，但单次消耗的 Token 越多。建议 16。",
+    "default": 16
+  },
+  "default_scrape_count": {
+    "type": "int",
+    "description": "文字搜图默认抓取的候选图片数量",
+    "hint": "LLM 未指定数量时，默认从 SerpApi(google_images) 抓取的候选图数量。建议为 16 的倍数。",
+    "default": 64
+  },
+  "pic_search_timeout": {
+    "type": "int",
+    "description": "文字搜图(pic_search)整体超时时间（秒）",
+    "hint": "抓图与 VLM 淘汰赛的总时长上限，超时即中止并返回错误，避免 LLM 工具调用长时间挂起。建议 90。",
+    "default": 90
+  },
+  "region": {
+    "type": "object",
+    "description": "搜索地区与语言",
+    "hint": "影响 Google 搜图与以图搜图的结果地区/语言，默认美国(英语)。",
+    "items": {
+      "gl": {
+        "type": "string",
+        "description": "国家/地区代码 (gl)",
+        "hint": "Google 的 gl 参数，两位国家代码，如 us、cn、jp。默认 us（美国）。",
+        "default": "us"
+      },
+      "hl": {
+        "type": "string",
+        "description": "界面语言代码 (hl)",
+        "hint": "Google 的 hl 参数，如 en、zh-cn、ja。默认 en（英语）。",
+        "default": "en"
+      }
+    }
+  },
+  "api_keys": {
+    "type": "object",
+    "description": "API 密钥配置",
+    "hint": "配置搜图所需的 SerpApi 密钥",
+    "items": {
+      "serpapi_keys": {
+        "type": "list",
+        "description": "SerpApi Keys",
+        "hint": "google_images（文字搜图）与 google_lens（以图搜图）共用，支持填写多个 Key 负载均衡。可在 https://serpapi.com 获取。留空则两项功能均不可用。",
+        "obvious_hint": true,
+        "default": []
+      }
+    }
+  },
+  "network": {
+    "type": "object",
+    "description": "网络配置",
+    "hint": "代理、User-Agent、图床上传等",
+    "items": {
+      "proxy_url": {
+        "type": "string",
+        "description": "代理服务器 URL",
+        "hint": "HTTP/HTTPS 代理地址，如 http://127.0.0.1:7890。留空或无效则不使用代理。",
+        "default": ""
+      },
+      "user_agent": {
+        "type": "string",
+        "description": "User-Agent",
+        "hint": "HTTP 请求使用的 User-Agent，留空使用内置默认值。",
+        "default": ""
+      },
+      "allow_image_upload": {
+        "type": "bool",
+        "description": "允许上传图片到第三方图床",
+        "hint": "以图搜图时，若图片为本地/base64，会上传到 Catbox 图床以获取 SerpApi 可访问的公网 URL。",
+        "default": true
+      },
+      "allow_local_file_access": {
+        "type": "bool",
+        "description": "允许读取本地文件",
+        "hint": "允许读取 file:// 或本地磁盘路径的图片。出于安全默认关闭。",
+        "default": false
+      }
+    }
+  },
+  "max_results": {
+    "type": "int",
+    "description": "以图搜图最大结果数",
+    "hint": "以图搜图每次返回/展示的最大结果数量。",
+    "default": 5,
+    "slider": {"min": 1, "max": 10, "step": 1}
+  }
+}
