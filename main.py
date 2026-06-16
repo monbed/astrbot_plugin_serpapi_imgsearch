@@ -190,7 +190,7 @@ class SerpApiImageSearchPlugin(Star):
     async def reverse_image_search(
         self, event: AstrMessageEvent, image_url: str = ""
     ) -> str:
-        """以图搜图：反向检索图片的出处、来源、作者或所属作品。
+        """反向检索图片的出处、来源、作者或所属作品。
 
         Args:
             image_url(string): 可选。待检索图片的公网 http/https 直链；留空则自动取当前或被引用消息中的图片。

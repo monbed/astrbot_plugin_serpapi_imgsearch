@@ -24,7 +24,7 @@
 | `api_keys.serpapi_keys` | **必填**。SerpApi Key 列表，搜图与以图搜图共用，支持多个 Key 负载均衡。[获取](https://serpapi.com/manage-api-key) | `[]` |
 | `vlm_provider_id` | 文字搜图用于视觉筛选的 Provider ID。留空则用当前会话默认模型（需支持图片输入）。 | 空 |
 | `batch_size` | 每轮淘汰赛单批处理的图片数量。 | 16 |
-| `default_scrape_count` | 文字搜图默认抓取的候选图数量（建议 16 的倍数）。 | 64 |
+| `default_scrape_count` | 文字搜图默认抓取的候选图数量（建议 16 的倍数）。 | 16 |
 | `region.gl` | 搜索国家/地区代码（Google `gl`），如 `us`、`cn`、`jp`。 | us |
 | `region.hl` | 界面语言代码（Google `hl`），如 `en`、`zh-cn`、`ja`。 | en |
 | `network.proxy_url` | HTTP/HTTPS 代理，如 `http://127.0.0.1:7890`。留空不使用。 | 空 |
