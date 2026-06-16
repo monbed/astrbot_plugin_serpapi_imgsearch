@@ -1,7 +1,4 @@
-"""SerpApi 客户端：统一封装请求、多 Key 轮询与错误处理。
-
-供文字搜图（google_images 引擎）与以图搜图（google_lens 引擎）共用。
-"""
+"""SerpApi 客户端：统一封装请求、多 Key 轮询与错误处理，供 google_images/google_lens 共用。"""
 
 from __future__ import annotations
 
@@ -80,12 +77,9 @@ class SerpApiClient:
     async def get(self, engine: str, params: dict) -> dict:
         """向 SerpApi 发起请求并返回解析后的 JSON。
 
-        Args:
-            engine: SerpApi 引擎名，如 "google_images" / "google_lens"。
-            params: 其它查询参数（会自动剔除空值并附加 engine 与 api_key）。
-
-        Raises:
-            SerpApiError: 无可用 Key、全部 Key 失败或返回业务错误时抛出。
+        engine 为引擎名（google_images/google_lens）；params 为其余查询参数
+        （自动剔除空值并附加 engine 与 api_key）。无可用 Key、全部 Key 失败或返回
+        业务错误时抛出 SerpApiError。
         """
         if not self.api_keys:
             raise SerpApiError(

@@ -1,6 +1,4 @@
-"""图片下载与网格图拼接：异步下载候选图，用 Pillow 拼接为带编号的网格图，
-供 VLM 一次性比较挑选。
-"""
+"""图片下载与网格图拼接：异步下载候选图，Pillow 拼成带编号网格图供 VLM 比较。"""
 
 from __future__ import annotations
 
@@ -30,10 +28,8 @@ async def download_image(
 ) -> bytes | None:
     """异步下载单张图片（带重试），失败返回 None。
 
-    复用 HttpService 的共享会话与连接池，避免每张图都新建 ClientSession。
-    默认按证书校验下载；仅当遇到 SSL 证书错误时，通过 per-request 的 ssl 参数
-    对该 URL 降级为不校验重试，把"关闭证书校验"的暴露面收敛到确有证书问题的图源，
-    而非对所有请求一律不校验。
+    默认校验证书；仅在该 URL 出现 SSL 证书错误时对它单独降级为不校验重试，
+    把"关闭校验"的暴露面收敛到确有证书问题的图源，而非一律不校验。
     """
     last_exception = None
     verify_ssl = True

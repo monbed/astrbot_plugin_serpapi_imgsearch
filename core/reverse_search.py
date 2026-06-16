@@ -1,8 +1,4 @@
-"""以图搜图：SerpApi(google_lens) 反向检索 + 结果格式化。
-
-只使用 Google Lens（SerpApi）一种引擎，多 Key 轮询由 SerpApiClient 处理。
-结果不主动发送卡片，统一以结构化 JSON 返回，交由 LLM 自行展示。
-"""
+"""以图搜图：SerpApi(google_lens) 反向检索 + 结果格式化为结构化 JSON 交 LLM 展示。"""
 
 from __future__ import annotations
 
@@ -28,16 +24,10 @@ async def google_lens_search(
     max_results: int,
     hl: str,
 ) -> list[SearchResultItem]:
-    """通过 SerpApi google_lens 引擎做反向图片检索。
+    """通过 SerpApi google_lens 引擎做反向图片检索，返回结果列表。
 
-    Args:
-        client: 共享的 SerpApiClient（含多 Key 轮询）。
-        image_url: 待检索图片的公网 URL。
-        max_results: 最多返回的结果数。
-        hl: 界面语言。
-
-    Returns:
-        结果列表。SerpApi 出错时由 client 抛出 SerpApiError。
+    image_url 须为公网 URL；max_results 截断返回数；hl 为界面语言。
+    SerpApi 出错时由 client 抛出 SerpApiError。
     """
     if not image_url.startswith(("http://", "https://")):
         logger.warning("[serpapi_imgsearch] google_lens 仅支持公网 URL 图片")

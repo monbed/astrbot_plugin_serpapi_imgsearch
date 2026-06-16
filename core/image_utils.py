@@ -1,6 +1,4 @@
-"""网络与图片工具：封装代理 / UA / 权限开关与共享 aiohttp 会话的 HttpService，
-以及从消息事件中提取图片源的无状态辅助函数。
-"""
+"""网络与图片工具：HttpService（代理/UA/权限/共享会话）+ 从消息提取图片源的辅助函数。"""
 
 from __future__ import annotations
 
@@ -37,8 +35,8 @@ def _read_file_bytes(file_path: str) -> bytes:
 def _guess_image_type(data: bytes) -> tuple[str, str]:
     """据文件头(magic bytes)推断图片 (扩展名, MIME)，未知则回退 jpg。
 
-    Catbox 依上传文件名的扩展名决定其公网 URL 后缀；若一律按 jpg 上传，PNG/GIF 等
-    会得到与内容不符的 .jpg 链接，可能被下游(SerpApi)按扩展名误判。
+    Catbox 按上传文件名后缀生成公网 URL；一律按 jpg 会让 PNG/GIF 得到与内容不符的
+    .jpg 链接，可能被下游(SerpApi)误判，故按真实类型命名。
     """
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
         return "png", "image/png"
@@ -50,10 +48,7 @@ def _guess_image_type(data: bytes) -> tuple[str, str]:
 
 
 class HttpService:
-    """封装网络配置（代理 / UA / 权限开关）与共享 aiohttp 会话。
-
-    取代原先散落的模块级全局状态，由插件实例持有并向下传递，避免全局可变状态。
-    """
+    """封装网络配置（代理 / UA / 权限开关）与共享 aiohttp 会话，由插件实例持有并向下传递。"""
 
     def __init__(
         self,
@@ -109,11 +104,10 @@ class HttpService:
         self._session = None
 
     async def read_image_bytes(self, source: str) -> bytes | None:
-        r"""读取本地/内联图片源并返回字节数据。
+        r"""读取本地/内联图片源（file://、本地绝对路径、base64://、data:image）的字节。
 
-        支持 file:// 路径、本地绝对路径、base64:// 与 data:image 等格式。
-        HTTP(S) URL 由上游 get_http_image_url 直接处理，此处不再下载。
-        本地文件访问受 allow_local_file_access 控制（默认禁用以防信息泄露）。
+        HTTP(S) URL 由上游 get_http_image_url 处理，此处不下载。本地文件访问受
+        allow_local_file_access 控制（默认禁用以防信息泄露）。
         """
         if not source:
             return None

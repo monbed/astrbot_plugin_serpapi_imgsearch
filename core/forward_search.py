@@ -1,8 +1,4 @@
-"""文字搜图：SerpApi(google_images) 取候选图 + VLM 淘汰赛挑选最佳图。
-
-- ``fetch_image_urls``：通过 SerpApi 的 google_images 引擎抓取候选图直链。
-- ``run_tournament``：分批拼图 + VLM 多轮筛选，逐轮淘汰直到剩 1 张。
-"""
+"""文字搜图：SerpApi(google_images) 抓候选图直链 + VLM 分批淘汰赛选出最佳图。"""
 
 from __future__ import annotations
 
@@ -20,7 +16,7 @@ from .vlm import select_from_collage
 
 # google_images 每页约 100 条，最多翻几页防止失控
 _MAX_PAGES = 10
-# 每一轮淘汰赛内并发处理的批次上限（并发包含下载+VLM 调用），避免一次发起过多请求
+# 单轮内并发处理的批次上限（每批含下载+VLM 调用），避免一次发起过多请求
 _MAX_CONCURRENT_BATCHES = 8
 
 
@@ -121,8 +117,7 @@ async def run_tournament(
 
         effective_prompt = query
         enhancements: list[str] = []
-        # 当剩余候选可装进一张拼图（单批）时进入决赛圈，做更严格的对比。
-        # "选出一半"由 batch_max_selection 强约束，避免与 prompt 文案各执一词。
+        # 候选可装进单批时进入决赛圈，做更严格对比；"砍一半"由 batch_max_selection 强约束。
         batch_max_selection: int | None = None
         if len(current_winners) <= batch_size:
             batch_max_selection = max(1, math.ceil(len(current_winners) / 2))

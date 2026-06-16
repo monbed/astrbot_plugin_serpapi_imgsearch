@@ -19,8 +19,8 @@ def _normalize_indices(
 ) -> list[int]:
     """把原始编号裁剪到合法范围、保序去重，并截断到 max_selection 张。
 
-    VLM 不一定遵守 prompt 中的数量约束，故在输出端强制裁剪，确保"该选几张"以
-    max_selection 为唯一可信来源（决赛圈"砍一半"的收敛逻辑依赖于此）。
+    VLM 不一定遵守 prompt 的数量约束，故在输出端强制裁剪——"该选几张"以 max_selection
+    为唯一可信来源（决赛圈"砍一半"的收敛逻辑依赖于此）。
     """
     valid = [n for n in raw if 1 <= n <= total_images_count]
     return list(dict.fromkeys(valid))[:max_selection]
@@ -33,11 +33,10 @@ async def select_from_collage(
     vlm_provider: Provider,
     max_selection: int | None = None,
 ) -> list[int]:
-    """让 VLM 从网格图中挑选匹配的图片，返回 1-based 编号列表。
+    """让 VLM 从网格图中挑选匹配的图片，返回 1-based 编号列表（裁剪到 1..total_images_count）。
 
-    使用 JSON 结构化提示，附带正则兜底解析；返回的编号会裁剪到 1..total_images_count。
-    ``max_selection`` 为本批期望选出的最大张数：调用方（如决赛圈）显式指定时以其为准，
-    留空则按 SELECTION_RATIO 估算，确保"该选几张"只有单一来源。
+    ``max_selection`` 为本批最大选出张数：调用方显式指定时以其为准，留空则按
+    SELECTION_RATIO 估算，确保"该选几张"只有单一来源。
     """
     base64_str = base64.b64encode(image_bytes).decode("utf-8")
     image_url = f"base64://{base64_str}"
