@@ -32,8 +32,8 @@
       "hl": {
         "type": "string",
         "description": "界面语言代码 (hl)",
-        "hint": "界面语言，如 en、zh-cn、ja。默认 en。",
-        "default": "en"
+        "hint": "界面语言，如 en、zh-cn、ja。默认 zh-cn。",
+        "default": "zh-cn"
       }
     }
   },
