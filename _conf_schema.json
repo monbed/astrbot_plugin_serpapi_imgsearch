@@ -71,8 +71,22 @@
       "allow_image_upload": {
         "type": "bool",
         "description": "允许上传图片到第三方图床",
-        "hint": "以图搜图时本地/base64 图片会上传到 Catbox 图床以获取公网 URL。",
+        "hint": "以图搜图时本地/临时图片会上传到所选图床以获取公网 URL（关闭则仅支持公网直链图片）。",
         "default": true
+      },
+      "image_host": {
+        "type": "string",
+        "description": "图床（以图搜图上传用）",
+        "hint": "litterbox=临时(默认1h，推荐)、uguu=临时(约3h)、catbox=永久。临时图床更适合以图搜图，且对代理/机房 IP 更友好；catbox 常封机房/代理 IP。",
+        "options": ["litterbox", "uguu", "catbox"],
+        "default": "litterbox"
+      },
+      "litterbox_time": {
+        "type": "string",
+        "description": "Litterbox 文件保留时长",
+        "hint": "仅当图床为 litterbox 时生效。以图搜图只需链接存活几分钟，默认 1h 足够。",
+        "options": ["1h", "12h", "24h", "72h"],
+        "default": "1h"
       }
     }
   },

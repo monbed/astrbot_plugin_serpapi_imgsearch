@@ -33,12 +33,14 @@ class SerpApiImageSearchPlugin(Star):
         super().__init__(context)
         self.config = self._config_to_dict(config)
 
-        # 网络配置（代理 / UA / 权限开关）封装进 HttpService，随插件实例持有
+        # 网络配置（代理 / UA / 权限开关 / 图床）封装进 HttpService，随插件实例持有
         network = self._get_nested("network", default={}) or {}
         self.http = HttpService(
             proxy_url=network.get("proxy_url", ""),
             user_agent=network.get("user_agent", ""),
             allow_image_upload=network.get("allow_image_upload", True),
+            image_host=network.get("image_host", "litterbox"),
+            litterbox_time=network.get("litterbox_time", "1h"),
         )
 
         # 共享 SerpApi 客户端（搜图与以图搜图共用）

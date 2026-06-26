@@ -28,7 +28,9 @@
 | `region.gl` | 搜索国家/地区代码（Google `gl`），如 `us`、`cn`、`jp`。 | us |
 | `region.hl` | 界面语言代码（Google `hl`），如 `en`、`zh-cn`、`ja`。 | zh-cn |
 | `network.proxy_url` | HTTP/HTTPS 代理，如 `http://127.0.0.1:7890`。留空不使用。 | 空 |
-| `network.allow_image_upload` | 以图搜图时允许把本地/base64 图片上传到 Catbox 取公网 URL。 | true |
+| `network.allow_image_upload` | 以图搜图时允许把本地/临时图片上传到图床取公网 URL（关闭则仅支持公网直链图）。 | true |
+| `network.image_host` | 上传图床：`litterbox`(临时,推荐)、`uguu`(临时)、`catbox`(永久)。临时图床更适合以图搜图，且对代理/机房 IP 更友好。 | litterbox |
+| `network.litterbox_time` | 仅 `litterbox` 生效，文件保留时长：`1h`/`12h`/`24h`/`72h`。 | 1h |
 | `max_results` | 以图搜图最大结果数。 | 5 |
 
 3. 文字搜图依赖**视觉/多模态模型**：请配置 `vlm_provider_id`，或确保当前会话的默认对话模型支持图片输入。
@@ -38,7 +40,7 @@
 SerpApi 服务器需要能从公网访问到待检索的图片：
 
 - 若图片本身已是公网 http(s) URL（多数平台的图片消息）→ 直接使用。
-- 否则在 `allow_image_upload=true` 时，把图片上传到 [Catbox](https://catbox.moe) 图床换取公网 URL。
+- 否则在 `allow_image_upload=true` 时，把图片上传到所选图床（`image_host`：[Litterbox](https://litterbox.catbox.moe)/[uguu](https://uguu.se)/[Catbox](https://catbox.moe)）换取公网 URL。
 - 若转链失败，工具会返回提示，模型应**降级为纯视觉辨识**继续回答，不会中断对话。
 
 ## 使用示例

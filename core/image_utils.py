@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 import os
 import re
 from typing import Any
@@ -21,7 +22,20 @@ DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
-CATBOX_UPLOAD_URL = "https://catbox.moe/user/api.php"
+# 图床上传端点（均为匿名上传，无需 API Key）
+CATBOX_UPLOAD_URL = "https://catbox.moe/user/api.php"  # 永久
+LITTERBOX_UPLOAD_URL = (
+    "https://litterbox.catbox.moe/resources/internals/api.php"  # 临时(1h~72h)
+)
+UGUU_UPLOAD_URL = "https://uguu.se/upload.php"  # 临时(约 3h)，响应为 JSON
+IMAGE_HOSTS = ("litterbox", "uguu", "catbox")
+LITTERBOX_TIMES = ("1h", "12h", "24h", "72h")
+# 各图床单文件大小上限（仅作安全钳制；以图搜图用的图通常只有几 MB）
+_HOST_MAX_BYTES = {
+    "catbox": 200 * 1024 * 1024,
+    "litterbox": 1024 * 1024 * 1024,
+    "uguu": 128 * 1024 * 1024,
+}
 # 共享会话的最大并发连接数：拼图阶段会并发下载大量候选图，显式设上限而非依赖 aiohttp 默认值
 HTTP_CONNECTION_LIMIT = 64
 
@@ -35,7 +49,7 @@ def _read_file_bytes(file_path: str) -> bytes:
 def _guess_image_type(data: bytes) -> tuple[str, str]:
     """据文件头(magic bytes)推断图片 (扩展名, MIME)，未知则回退 jpg。
 
-    Catbox 按上传文件名后缀生成公网 URL；一律按 jpg 会让 PNG/GIF 得到与内容不符的
+    图床按上传文件名后缀生成公网 URL；一律按 jpg 会让 PNG/GIF 得到与内容不符的
     .jpg 链接，可能被下游(SerpApi)误判，故按真实类型命名。
     """
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -55,12 +69,18 @@ class HttpService:
         proxy_url: str = "",
         user_agent: str = "",
         allow_image_upload: bool = True,
+        image_host: str = "litterbox",
+        litterbox_time: str = "1h",
     ) -> None:
         self.proxy_url: str | None = self._normalize_proxy(proxy_url)
         self._user_agent = (
             user_agent.strip() if user_agent and user_agent.strip() else None
         )
         self.allow_image_upload = bool(allow_image_upload)
+        self.image_host = image_host if image_host in IMAGE_HOSTS else "litterbox"
+        self.litterbox_time = (
+            litterbox_time if litterbox_time in LITTERBOX_TIMES else "1h"
+        )
         self._session: aiohttp.ClientSession | None = None
         self._session_lock = asyncio.Lock()
         if self.proxy_url:
@@ -147,42 +167,92 @@ class HttpService:
         return None
 
     async def upload_image(self, image_bytes: bytes) -> str | None:
-        """将图片上传到 Catbox 图床（免费、无需 API Key），返回公网 URL。"""
+        """把图片上传到所选图床（litterbox/uguu/catbox，均匿名免 Key），返回公网 URL。"""
         if not image_bytes:
             return None
-        if len(image_bytes) > 200 * 1024 * 1024:
-            logger.warning("[serpapi_imgsearch] 图片过大，超过 Catbox 200MB 限制")
+        host = self.image_host
+        if len(image_bytes) > _HOST_MAX_BYTES.get(host, 200 * 1024 * 1024):
+            logger.warning(f"[serpapi_imgsearch] 图片过大，超过 {host} 图床大小上限")
+            return None
+        try:
+            if host == "uguu":
+                return await self._upload_uguu(image_bytes)
+            if host == "catbox":
+                return await self._upload_catbox_family(
+                    CATBOX_UPLOAD_URL, {"reqtype": "fileupload"}, image_bytes, "Catbox"
+                )
+            return await self._upload_catbox_family(
+                LITTERBOX_UPLOAD_URL,
+                {"reqtype": "fileupload", "time": self.litterbox_time},
+                image_bytes,
+                "Litterbox",
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"[serpapi_imgsearch] 图床上传异常({host}): {e}")
             return None
 
+    def _build_form(
+        self, file_field: str, image_bytes: bytes, extra: dict | None = None
+    ) -> aiohttp.FormData:
+        """构造 multipart 表单：附加字段 + 按真实类型命名的图片文件字段。"""
+        ext, content_type = _guess_image_type(image_bytes)
+        data = aiohttp.FormData()
+        for key, value in (extra or {}).items():
+            data.add_field(key, value)
+        data.add_field(
+            file_field, image_bytes, filename=f"image.{ext}", content_type=content_type
+        )
+        return data
+
+    async def _upload_catbox_family(
+        self, endpoint: str, fields: dict, image_bytes: bytes, name: str
+    ) -> str | None:
+        """Catbox / Litterbox：fileToUpload 上传，响应体即公网 URL（纯文本）。"""
         client_timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT_SECONDS)
-        try:
-            session = await self.session()
-            ext, content_type = _guess_image_type(image_bytes)
-            data = aiohttp.FormData()
-            data.add_field("reqtype", "fileupload")
-            data.add_field(
-                "fileToUpload",
-                image_bytes,
-                filename=f"image.{ext}",
-                content_type=content_type,
+        session = await self.session()
+        data = self._build_form("fileToUpload", image_bytes, fields)
+        async with session.post(
+            endpoint,
+            data=data,
+            headers={"User-Agent": self.user_agent},
+            timeout=client_timeout,
+            proxy=self.proxy_url,
+        ) as resp:
+            text = (await resp.text()).strip()
+            if resp.status == 200 and text.startswith("https://"):
+                logger.info(f"[serpapi_imgsearch] 已上传到 {name} 图床: {text}")
+                return text
+            logger.warning(
+                f"[serpapi_imgsearch] {name} 上传失败: HTTP {resp.status}, 响应={text[:200]}"
             )
-            async with session.post(
-                CATBOX_UPLOAD_URL,
-                data=data,
-                headers={"User-Agent": self.user_agent},
-                timeout=client_timeout,
-                proxy=self.proxy_url,
-            ) as resp:
-                if resp.status == 200:
-                    url = (await resp.text()).strip()
-                    if url.startswith("https://"):
-                        logger.info(f"[serpapi_imgsearch] 已上传到 Catbox 图床: {url}")
-                        return url
-                    logger.warning(f"[serpapi_imgsearch] Catbox 返回异常: {url}")
-                else:
-                    logger.warning(f"[serpapi_imgsearch] Catbox 上传失败: HTTP {resp.status}")
-        except Exception as e:  # noqa: BLE001
-            logger.error(f"[serpapi_imgsearch] Catbox 上传异常: {e}")
+        return None
+
+    async def _upload_uguu(self, image_bytes: bytes) -> str | None:
+        """uguu.se：files[] 上传，响应为 JSON {success, files:[{url}]}。"""
+        client_timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT_SECONDS)
+        session = await self.session()
+        data = self._build_form("files[]", image_bytes)
+        async with session.post(
+            UGUU_UPLOAD_URL,
+            data=data,
+            headers={"User-Agent": self.user_agent},
+            timeout=client_timeout,
+            proxy=self.proxy_url,
+        ) as resp:
+            text = (await resp.text()).strip()
+            if resp.status == 200:
+                try:
+                    obj = json.loads(text)
+                    if obj.get("success") and obj.get("files"):
+                        url = (obj["files"][0] or {}).get("url", "")
+                        if url.startswith("https://"):
+                            logger.info(f"[serpapi_imgsearch] 已上传到 uguu 图床: {url}")
+                            return url
+                except (ValueError, KeyError, IndexError, TypeError):
+                    pass
+                logger.warning(f"[serpapi_imgsearch] uguu 返回异常: {text[:200]}")
+            else:
+                logger.warning(f"[serpapi_imgsearch] uguu 上传失败: HTTP {resp.status}")
         return None
 
     async def get_public_url_for_image(self, image: Image) -> str | None:
@@ -221,7 +291,7 @@ class HttpService:
             return None
 
         logger.info(
-            "[serpapi_imgsearch] 图片为本地/内联来源，准备上传到 Catbox 图床以获取公网 URL..."
+            "[serpapi_imgsearch] 图片为本地/内联来源，准备上传到图床以获取公网 URL..."
         )
         return await self.upload_image(image_bytes)
 
