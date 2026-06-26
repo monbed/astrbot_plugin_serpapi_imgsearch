@@ -18,7 +18,7 @@ from astrbot.api.star import Context, Star
 
 from .core.composer import download_image
 from .core.forward_search import fetch_image_urls, run_tournament
-from .core.image_utils import HttpService, extract_image_source_from_event
+from .core.image_utils import HttpService, extract_image_from_event
 from .core.reverse_search import (
     build_llm_payload,
     google_lens_search,
@@ -39,7 +39,6 @@ class SerpApiImageSearchPlugin(Star):
             proxy_url=network.get("proxy_url", ""),
             user_agent=network.get("user_agent", ""),
             allow_image_upload=network.get("allow_image_upload", True),
-            allow_local_file_access=network.get("allow_local_file_access", False),
         )
 
         # 共享 SerpApi 客户端（搜图与以图搜图共用）
@@ -61,9 +60,9 @@ class SerpApiImageSearchPlugin(Star):
         # 以图搜图配置
         self.max_results = self._safe_int(self.config.get("max_results"), 5)
 
-        # 搜索地区/语言（默认美国，英语）
+        # 搜索地区/语言（地区默认美国，界面语言默认 zh-cn）
         self.gl = str(self._get_nested("region", "gl", default="us") or "us").strip()
-        self.hl = str(self._get_nested("region", "hl", default="en") or "en").strip()
+        self.hl = str(self._get_nested("region", "hl", default="zh-cn") or "zh-cn").strip()
 
         if not self.client.has_keys():
             logger.warning(
@@ -205,13 +204,13 @@ class SerpApiImageSearchPlugin(Star):
         if image_url.startswith(("http://", "https://")):
             http_url = image_url
         else:
-            source = extract_image_source_from_event(event)
-            if not source:
+            image_comp = extract_image_from_event(event)
+            if image_comp is None:
                 return (
                     "error: 未在消息中找到图片。请提示用户直接发送一张图片，"
                     "或引用一条包含图片的消息后再试。"
                 )
-            http_url = await self.http.get_http_image_url(source)
+            http_url = await self.http.get_public_url_for_image(image_comp)
             if not http_url:
                 return (
                     "error: 无法获取图片的公网链接（图床上传被禁用或失败）。"

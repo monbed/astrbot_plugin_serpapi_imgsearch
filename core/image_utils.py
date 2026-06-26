@@ -55,14 +55,12 @@ class HttpService:
         proxy_url: str = "",
         user_agent: str = "",
         allow_image_upload: bool = True,
-        allow_local_file_access: bool = False,
     ) -> None:
         self.proxy_url: str | None = self._normalize_proxy(proxy_url)
         self._user_agent = (
             user_agent.strip() if user_agent and user_agent.strip() else None
         )
         self.allow_image_upload = bool(allow_image_upload)
-        self.allow_local_file_access = bool(allow_local_file_access)
         self._session: aiohttp.ClientSession | None = None
         self._session_lock = asyncio.Lock()
         if self.proxy_url:
@@ -104,11 +102,7 @@ class HttpService:
         self._session = None
 
     async def read_image_bytes(self, source: str) -> bytes | None:
-        r"""读取本地/内联图片源（file://、本地绝对路径、base64://、data:image）的字节。
-
-        HTTP(S) URL 由上游 get_http_image_url 处理，此处不下载。本地文件访问受
-        allow_local_file_access 控制（默认禁用以防信息泄露）。
-        """
+        r"""读取本地/内联图片源（file://、本地路径、base64://、data:image）的字节，作为取图回退路径。"""
         if not source:
             return None
 
@@ -117,11 +111,6 @@ class HttpService:
             or re.match(r"^[A-Za-z]:[/\\]", source)
             or source.startswith("/")
         ):
-            if not self.allow_local_file_access:
-                logger.warning(
-                    "[serpapi_imgsearch] 本地文件访问已禁用，如需可在配置中开启 allow_local_file_access。"
-                )
-                return None
             if source.startswith("file://"):
                 file_path = source[7:]
                 if (
@@ -196,50 +185,59 @@ class HttpService:
             logger.error(f"[serpapi_imgsearch] Catbox 上传异常: {e}")
         return None
 
-    async def get_http_image_url(self, source: str) -> str | None:
-        """把图片源转换为可被 SerpApi 访问的公网 HTTP URL。
-
-        已是 HTTP URL 直接返回；否则在允许的前提下读取并上传到 Catbox。
-        """
-        if not source:
+    async def get_public_url_for_image(self, image: Image) -> str | None:
+        """取图片的公网 URL：已是 http(s) 直接复用，否则用 convert_to_base64() 还原字节上传图床。"""
+        if image is None:
             return None
-        if source.startswith(("http://", "https://")):
+
+        raw = (image.url or image.file or "").strip()
+        if raw.startswith(("http://", "https://")):
             logger.info(
-                f"[serpapi_imgsearch] 图片已是公网 URL，直接用于检索（未上传图床）: {source}"
+                f"[serpapi_imgsearch] 图片已是公网 URL，直接用于检索（未上传图床）: {raw}"
             )
-            return source
+            return raw
+
         if not self.allow_image_upload:
             logger.warning(
                 "[serpapi_imgsearch] 图床上传已禁用，仅支持公网 URL 图片。"
                 "如需以图搜本地图片，请在配置中开启 allow_image_upload。"
             )
             return None
-        logger.info(
-            "[serpapi_imgsearch] 图片为本地/base64 来源，准备上传到 Catbox 图床以获取公网 URL..."
-        )
-        image_bytes = await self.read_image_bytes(source)
+
+        # 优先用框架解析器还原字节（兼容预处理落地的本地临时文件）；失败再回退到按源字符串本地读取。
+        image_bytes: bytes | None = None
+        try:
+            b64 = await image.convert_to_base64()
+            if b64:
+                image_bytes = base64.b64decode(b64)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(
+                f"[serpapi_imgsearch] convert_to_base64 还原图片失败，回退本地读取: {e}"
+            )
+        if not image_bytes:
+            image_bytes = await self.read_image_bytes(raw)
         if not image_bytes:
             logger.warning("[serpapi_imgsearch] 读取图片字节失败，无法上传图床。")
             return None
+
+        logger.info(
+            "[serpapi_imgsearch] 图片为本地/内联来源，准备上传到 Catbox 图床以获取公网 URL..."
+        )
         return await self.upload_image(image_bytes)
 
 
-def extract_image_source_from_event(event: Any) -> str | None:
-    """从当前消息或被引用消息中提取第一张图片的源（url/file/base64）。
+def extract_image_from_event(event: Any) -> Image | None:
+    """提取消息中第一张图片组件（优先正文，其次 Reply 链）。
 
-    优先正文图片，其次被引用消息（Reply）链中的图片。
+    返回组件本身而非 url 字符串，以便上层用 convert_to_base64() 取字节。
     """
     messages = event.get_messages() or []
     for comp in messages:
-        if isinstance(comp, Image):
-            src = comp.url or comp.file
-            if src:
-                return src
+        if isinstance(comp, Image) and (comp.url or comp.file):
+            return comp
     for comp in messages:
         if isinstance(comp, Reply) and getattr(comp, "chain", None):
             for sub in comp.chain:
-                if isinstance(sub, Image):
-                    src = sub.url or sub.file
-                    if src:
-                        return src
+                if isinstance(sub, Image) and (sub.url or sub.file):
+                    return sub
     return None

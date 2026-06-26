@@ -26,10 +26,9 @@
 | `batch_size` | 每轮淘汰赛单批处理的图片数量。 | 16 |
 | `default_scrape_count` | 文字搜图默认抓取的候选图数量（建议 16 的倍数）。 | 16 |
 | `region.gl` | 搜索国家/地区代码（Google `gl`），如 `us`、`cn`、`jp`。 | us |
-| `region.hl` | 界面语言代码（Google `hl`），如 `en`、`zh-cn`、`ja`。 | en |
+| `region.hl` | 界面语言代码（Google `hl`），如 `en`、`zh-cn`、`ja`。 | zh-cn |
 | `network.proxy_url` | HTTP/HTTPS 代理，如 `http://127.0.0.1:7890`。留空不使用。 | 空 |
 | `network.allow_image_upload` | 以图搜图时允许把本地/base64 图片上传到 Catbox 取公网 URL。 | true |
-| `network.allow_local_file_access` | 允许读取本地路径图片。 | false |
 | `max_results` | 以图搜图最大结果数。 | 5 |
 
 3. 文字搜图依赖**视觉/多模态模型**：请配置 `vlm_provider_id`，或确保当前会话的默认对话模型支持图片输入。

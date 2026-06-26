@@ -21,7 +21,7 @@
   "region": {
     "type": "object",
     "description": "搜索地区与语言",
-    "hint": "影响搜图与以图搜图的结果地区/语言，默认美国(英语)。",
+    "hint": "影响搜图与以图搜图的结果地区/语言，地区默认美国、界面语言默认 zh-cn。",
     "items": {
       "gl": {
         "type": "string",
@@ -73,12 +73,6 @@
         "description": "允许上传图片到第三方图床",
         "hint": "以图搜图时本地/base64 图片会上传到 Catbox 图床以获取公网 URL。",
         "default": true
-      },
-      "allow_local_file_access": {
-        "type": "bool",
-        "description": "允许读取本地文件",
-        "hint": "允许读取 file:// 或本地磁盘路径的图片。出于安全默认关闭。",
-        "default": false
       }
     }
   },
